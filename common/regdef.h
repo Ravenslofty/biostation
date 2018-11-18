@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // This was taken from newlib, but I don't think there's anything actually copyrightable here.
 
 #ifndef REGDEF_H
