@@ -6,6 +6,7 @@
 
 // MIPS registers.
 #define zero	$0
+#define at	$at
 #define v0	$2
 #define v1	$3
 #define a0	$4
@@ -34,12 +35,15 @@
 #define k1	$27
 #define gp	$gp
 #define sp	$sp
-#define s8	$30
-#define ra	$31
+#define fp	$fp
+#define ra	$ra
 #define pc	$pc
 
 // MIPS Coprocessor 0 registers.
-#define Status	$12
-#define	PRid	$15
+#define BadVAddr $8
+#define Status	 $12
+#define Cause	 $13
+#define EPC	 $14
+#define	PRid	 $15
 
 #endif // REGDEF_H

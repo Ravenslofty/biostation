@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "regdef.h"
 
-.extern	ee_start
-.extern iop_start
+.extern	_ee_start
+.extern _iop_start
 
 .text
 // BIOS startup for both EE and IOP.
@@ -11,24 +11,11 @@
 _start:
 	mfc0	t0, PRid		// Get processor version.
 	li	t1, 0x59
-	blt	t0, t1, _iop_start	// If this is the IOP: jump to its specific loader.
-	nop				
-					// As a sanity check for any budding emulator devs,
-	bge	t0, t1, _ee_start	// check the EE PRid field is correct.
+	bge	t0, t1, _found_ee	// If this is the EE: jump to its specific loader.
 	nop
-_bad_prid:
-					// If that's wrong too, somebody messed up their COP0
-	add	sp, zero, zero		// implementation.
-	ori	sp, 0x5052		// 'PR'
-	sll	sp, 16
-	ori	sp, 0x6964		// 'id'
-	break				// Just so somebody gets the message.
-_ee_start:
-	li	sp, 0x70004000		// Set the stack pointer to the top of scratchpad RAM.
-	j	ee_start		// Jump to C.
+	j	_iop_start		// Otherwise, jump to the IOP.
 	nop
-_iop_start:
-					// We currently don't know where to put the IOP stack pointer.
-	j	iop_start
+_found_ee:
+	j	_ee_start		// Trampoline to get around the EE startup routine being undefined.
 	nop
-	break
+
