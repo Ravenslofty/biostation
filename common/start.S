@@ -4,7 +4,7 @@
 .extern	_ee_start
 .extern _iop_start
 
-.text
+.section ".common_start"
 // BIOS startup for both EE and IOP.
 // Because this is targeting emulators, we don't have to do nearly as much as the PS2 BIOS does.
 .global _start

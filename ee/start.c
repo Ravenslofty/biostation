@@ -3,8 +3,9 @@
 
 void ee_start()
 {
-    const char str[14] = "Hello, World!\n";
-    ee_kwrite(str, 14);
+    __asm__ volatile("move $3, $0\n"
+                "syscall\n"
+                ::: "$3");
 
     while (1);
 }
