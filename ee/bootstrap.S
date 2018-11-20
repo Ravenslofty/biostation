@@ -3,6 +3,8 @@
 
 .extern ee_start
 
+.extern memcpy
+
 #define end_of_ram		0x00100000
 
 // The syscall table sits at the end of kernel RAM.
@@ -20,29 +22,25 @@ _ee_start:
 	// meaningless to an emulator, but very important on physical hardware, like MMU init.
 	li	t0, 0x70400000		// Coprocessors all usable, bootstrap exception vectors,
 	mtc0	t0, Status		// interrupts disabled.
-	// Set up the syscall table through a simple memcpy loop.
-	la	t0, syscall_table	// Load the RAM syscall table location.
-	la	t1, end_of_ram		// Load the end of RAM as an end location.
-	la	t2, _syscalls_start	// Load the ROM syscall table location.
-1:					// This loop is padded to avoid the short loop bug.
-	lq	t3, 0(t2)		// Grab a handful of stuff...
-	sq	t3, 0(t0)		// and dump it somewhere else.
-	lq	t3, 16(t2)		
-	sq	t3, 16(t0)		
-	addi	t0, 32			// Bump the pointers...
-	addi	t2, 32		
-	bne	t0, t1, 1b		// If we haven't reached the end of RAM, continue.
-	nop
-	// Set up the kernel stack pointer in $k0.
-	la	k1, stack_pointer
+	
 	// Now we can set up the C runtime; or enough of it for us, anyway.
 	li	sp, 0x70004000		// Set the stack pointer to the top of scratchpad RAM.
+	
+	// Set up the syscall table through a simple memcpy loop.
+	la	a0, syscall_table	// Load the RAM syscall table location.	
+	la	a1, _ee_syscalls_start	// Load the ROM syscall table location.
+	li	a2, syscall_table_size	// Load the size of the syscall table.
+	jal	memcpy
+	nop
+	
+	// Set up the kernel stack pointer in $k0.
+	la	k1, stack_pointer
 	j	ee_start		// Jump to C.
 	nop
 
 // Preserve all registers except $k0, $k1 and $ra.
-.global _save_context
-_save_context:
+.global _ee_save_context
+_ee_save_context:
 	.set noat
 	addi	k1, -448
 	sq	at, 0(k1)
@@ -78,8 +76,8 @@ _save_context:
 	.set at
 
 // Restore all registers except $k0, $k1 and $ra.
-.global _restore_context
-_restore_context:
+.global _ee_restore_context
+_ee_restore_context:
 	.set noat
 	lq	at, 0(k1)
 	lq	v0, 16(k1)
@@ -117,209 +115,222 @@ _restore_context:
 // Handle a System Call Exception.
 // $3: syscall number
 // $4...: args
-_syscall_handler:
+_ee_syscall_handler:
+	addi	k1, -16			// Save $ra to stack.
+	sq	ra, 0(k1)
+	
 	la	k0, syscall_table	// Load the start of the syscall table.
 	andi	$3, 0x7F		// Mask out the "sign" bit of the syscall.
 	sll	$3, 2			// Convert syscall number to index.
 	addu	$3, k0			// Calculate the syscall table offset.
 	lw	$3, 0(k0)		// Find the handler address.
+
 	jalr	$3			// Jump to it.
 	nop
+	
+	lq	ra, 0(k1)		// Restore $ra from stack.
+	addi	k1, 16
+
 	mfc0	k0, EPC			// Increment EPC to run the next instruction.
 	addi	k0, 4
 	mtc0	k0, EPC
+	
 	sync				// Memory synchronisation.
 	eret				// And return.
 
 // A syscall handler that crashes.
-_unimplemented_syscall:
+_ee_unimplemented_syscall:
 	break
 
 // A syscall that says hello.
-_hello:
-	li	t0, 0x1000F180		// Load EE debug stdout address.
-	la	t1, _hello_string	// Load string address.
-1:
-	lbu	t2, 0(t1)		// memcpy loop.
-	sb	t2, 0(t0)
-	addi	t1, 1
+_ee_hello:
+	addi	k1, -48
+	sq	a0, 0(k1)
+	sq	a1, 16(k1)
+	sq	ra, 32(k1)
+
+	la	a0, _ee_hello_string	// Load string address.
+	li	a1, 13			// Load size of string
+	jal	ee_kwrite
 	nop
-	nop
-	bne	t2, zero, 1b
-	nop
+
+	lq	a0, 0(k1)
+	lq	a1, 16(k1)
+	lq	ra, 32(k1)
+	addi	k1, 48
+	
 	j	ra
+	nop
 
 // Handle an interrupt.
 .section .ee_int_common, "a"
-.global _interrupt_handler
-_interrupt_handler:
+.global _ee_interrupt_handler
+_ee_interrupt_handler:
 	// First, save the relevant state.
 	addi	k1, -16			// Save $t0 to stack.
 	sq	t0, 0(k1)
+	
 	// Then, examine the COP0 Cause register to find which interrupt we have.
 	mfc0	k0, Cause
 	andi	k0, 0x3F		// Extract Cause.ExcCode.
-	la	t0, _handlers_start	// Load start of handler table
-	add	k0, t0
+	la	t0, _ee_handlers_start	// Load start of handler table
+	add	k0, t0			// Add ExcCode to handler table
+
 	lq	t0, 0(k1)		// Restore $t0 from stack
 	addi	k1, 16
+	
 	lw	k0, 0(k0)		// Get the handler address.
 	jr	k0			// Jump to the handler.
 	nop
 
 .data
-.align	8
-_hello_string:
+_ee_hello_string:
 .asciz	"Hello, World!\n"
 
-.align	8
-_handlers_start:
-.int	_unimplemented_syscall	// 00: Interrupt.
-.int	_unimplemented_syscall	// 01: TLB Modified.
-.int	_unimplemented_syscall	// 02: TLB Refill (load)
-.int	_unimplemented_syscall	// 03: TLB Refill (store)
-.int	_unimplemented_syscall	// 04: Address error (load)
-.int	_unimplemented_syscall	// 05: Address error (store)
-.int	_unimplemented_syscall	// 06: Bus error (instruction)
-.int	_unimplemented_syscall	// 07: Bus error (data)
-.int	_syscall_handler	// 08: System call
-.int	_unimplemented_syscall	// 09: Breakpoint
-.int	_unimplemented_syscall	// 10: Reserved instruction
-.int	_unimplemented_syscall	// 11: Coprocessor unusable
-.int	_unimplemented_syscall	// 12: Overflow
-.int	_unimplemented_syscall	// 13: Trap
-.int	_unimplemented_syscall	// Unused
-.int	_unimplemented_syscall	// Unused
+_ee_handlers_start:
+.int	_ee_unimplemented_syscall	// 00: Interrupt.
+.int	_ee_unimplemented_syscall	// 01: TLB Modified.
+.int	_ee_unimplemented_syscall	// 02: TLB Refill (load)
+.int	_ee_unimplemented_syscall	// 03: TLB Refill (store)
+.int	_ee_unimplemented_syscall	// 04: Address error (load)
+.int	_ee_unimplemented_syscall	// 05: Address error (store)
+.int	_ee_unimplemented_syscall	// 06: Bus error (instruction)
+.int	_ee_unimplemented_syscall	// 07: Bus error (data)
+.int	_ee_syscall_handler		// 08: System call
+.int	_ee_unimplemented_syscall	// 09: Breakpoint
+.int	_ee_unimplemented_syscall	// 10: Reserved instruction
+.int	_ee_unimplemented_syscall	// 11: Coprocessor unusable
+.int	_ee_unimplemented_syscall	// 12: Overflow
+.int	_ee_unimplemented_syscall	// 13: Trap
+.int	_ee_unimplemented_syscall	// Unused
+.int	_ee_unimplemented_syscall	// Unused
 
-.align 	8
-
-_syscalls_start:
-.int	_hello			// 00: Hello()
-.int	_unimplemented_syscall 	// 01: ResetEE(int devices)
-.int	_unimplemented_syscall 	// 02: SetGsCrt(bool interlaced, int display_mode, bool frame)
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall 	// 04: Exit(int status)
-.int	_unimplemented_syscall 	// 05: _ExceptionEpilogue()
-.int	_unimplemented_syscall 	// 06: LoadExecPS2(const char* filename, int argc, char** argv)
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-.int	_unimplemented_syscall
-_syscalls_end:
+_ee_syscalls_start:
+.int	_ee_hello			// 00h: Hello()
+.int	_ee_unimplemented_syscall 	// 01h: ResetEE(int devices)
+.int	_ee_unimplemented_syscall 	// 02h: SetGsCrt(bool interlaced, int display_mode, bool frame)
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall 	// 04h: Exit(int status)
+.int	_ee_unimplemented_syscall 	// 05h: _ExceptionEpilogue()
+.int	_ee_unimplemented_syscall 	// 06h: LoadExecPS2(const char* filename, int argc, char** argv)
+.int	_ee_unimplemented_syscall	// 07h: ExecPS2(void (*entry)(), void* gp, int argc, char** argv)
+.int	_ee_unimplemented_syscall 
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall	// 10h: AddIntcHandler(int int_cause, int (*handler)(), int next, void* arg, int flag)
+.int	_ee_unimplemented_syscall	// 11h: RemoveIntcHandler(int int_cause, int handler_id)
+.int	_ee_unimplemented_syscall	// 12h: AddDmacHandler(int dmac_cause, int (*handler)(), int next, void* arg, int flag)
+.int	_ee_unimplemented_syscall	// 13h: RemoveDmacHandler(int dmac_cause, int handler_id)
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall	// 20h: CreateThread(ThreadParam* t)
+.int	_ee_unimplemented_syscall	// 21h: DeleteThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 22h: ExitThread()
+.int	_ee_unimplemented_syscall	// 23h: ExitDeleteThread()
+.int	_ee_unimplemented_syscall	// 24h: TerminateThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 25h: iTerminateThread(int thread_id)
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall	// 29h: ChangeThreadPriority(int thread_id, int priority)
+.int	_ee_unimplemented_syscall	// 2Ah: iChangeThreadPriority(int thread_id, int priority)
+.int	_ee_unimplemented_syscall	// 2Bh: RotateThreadReadyQueue(int priority)
+.int	_ee_unimplemented_syscall	// 2Ch: _iRotateThreadReadQueue(int priority)
+.int	_ee_unimplemented_syscall	// 2Dh: void ReleaseWaitThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 2Eh: int iReleaseWaitThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 2Fh: int GetThreadId()
+.int	_ee_unimplemented_syscall 	// 30h: int ReferThreadStatus(int thread_id, ThreadParam* status)
+.int	_ee_unimplemented_syscall	// 31h: int iReferThreadStatus(int thread_id, ThreadParam* status)
+.int	_ee_unimplemented_syscall	// 32h: void SleepThread()
+.int	_ee_unimplemented_syscall	// 33h: void WakeupThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 34h: int iWakeupThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 35h: int CancelWakeupThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 36h: int iCancelWakeupThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 37h: int SuspendThread(int thread_id)
+.int	_ee_unimplemented_syscall	// 38h: int iSuspendThread(int thread_id)
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
+.int	_ee_unimplemented_syscall
