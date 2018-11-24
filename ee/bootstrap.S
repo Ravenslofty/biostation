@@ -37,19 +37,16 @@ _ee_start:
         la      a1, _handlers_start
         li      a2, interrupt_table_size
         jal     memcpy
-        nop
         
         // Copy the syscall table.
         li      a0, SYSCALL_TABLE
         la      a1, _syscalls_start
         li      a2, syscall_table_size
         jal     memcpy
-        nop
 
         // Set up the kernel stack pointer in $k1.
         la      k1, stack_pointer
         j       ee_start                // Jump to C.
-        nop
 
 // Preserve all registers except $k0, $k1 and $ra.
 .global _save_context
@@ -85,7 +82,6 @@ _save_context:
         sq      sp, 416(k1)
         sq      fp, 432(k1)
         j       ra
-        nop
         .set at
 
 // Restore all registers except $k0, $k1 and $ra.
@@ -122,7 +118,6 @@ _restore_context:
         lq      fp, 432(k1)
         addi    k1, 448
         j       ra
-        nop
         .set at
 
 // Handle a System Call Exception.
@@ -139,7 +134,6 @@ _syscall_handler:
         lw      k0, 0(k0)               // Find the handler address.
 
         jalr    k0                      // Jump to it.
-        nop
         
         lq      ra, 0(k1)               // Restore $ra from stack.
         addi    k1, 16
@@ -154,13 +148,11 @@ _syscall_handler:
 // FlushCache is irrelevant to an emulator, so we stub it.
 _ee_flush_cache:
         jr      ra
-        nop
 
 // A syscall handler that crashes.
 _unimplemented_syscall:
         srl     a0, $3, 2
         jal     ee_unimplemented_syscall
-        nop
         break
 
 // A syscall that says hello.
@@ -172,7 +164,6 @@ _hello:
 
         la      a0, _hello_string       // Load string address.
         jal     ee_kwrite
-        nop
 
         lq      a0, 0(k1)
         lq      a1, 16(k1)
@@ -242,7 +233,7 @@ _syscalls_start:
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
-.int    _unimplemented_syscall  // 10h: AddIntcHandler(int int_cause, int (*handler)(), int next, void* arg, int flag)
+.int    ee_add_intc_handler     // 10h: AddIntcHandler(int int_cause, int (*handler)(), int next, void* arg, int flag)
 .int    _unimplemented_syscall  // 11h: RemoveIntcHandler(int int_cause, int handler_id)
 .int    _unimplemented_syscall  // 12h: AddDmacHandler(int dmac_cause, int (*handler)(), int next, void* arg, int flag)
 .int    _unimplemented_syscall  // 13h: RemoveDmacHandler(int dmac_cause, int handler_id)

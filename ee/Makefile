@@ -4,6 +4,6 @@ CC	= ee-gcc
 CFLAGS	= -O3 -ffreestanding -std=c99 -I../include -G0 -Wall
 ASFLAGS	= -I../include
 
-FILES	= bootstrap.o gs.o mem.o start.o stdout.o thread.o
+FILES	= bootstrap.o gs.o intc.o mem.o start.o stdout.o thread.o
 
 all: $(FILES)
