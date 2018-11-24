@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+typedef _Bool bool;
 typedef unsigned short u16;
 typedef signed short i16;
 typedef unsigned int u32;

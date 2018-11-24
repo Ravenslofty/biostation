@@ -228,7 +228,7 @@ _handlers_start:
 _syscalls_start:
 .int    _hello                  // 00h: Hello()
 .int    _unimplemented_syscall  // 01h: ResetEE(int devices)
-.int    _unimplemented_syscall  // 02h: SetGsCrt(bool interlaced, int display_mode, bool frame)
+.int    ee_gs_set_crt           // 02h: SetGsCrt(bool interlaced, int display_mode, bool frame)
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall  // 04h: Exit(int status)
 .int    _unimplemented_syscall  // 05h: _ExceptionEpilogue()
