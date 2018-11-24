@@ -2,7 +2,7 @@
 #include "elf.h"
 #include "stdout.h"
 
-extern int* current_thread;
+extern int* _current_thread;
 
 void ee_unimplemented_syscall(char id)
 {
@@ -25,7 +25,7 @@ void ee_start()
                 ::: "$3");
 
     // Initialise the current thread.
-    *current_thread = 0;
+    *_current_thread = 0;
 
     // Load the ELF; at the moment just from a hardcoded address.
     ee_kwrite("Loading ELF\n");

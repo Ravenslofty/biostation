@@ -284,8 +284,8 @@ _syscalls_start:
 .int    _unimplemented_syscall  // 39h: void ResumeThread(int thread_id)
 .int    _unimplemented_syscall  // 3Ah: int iResumeThread(int thread_id)
 .int    _unimplemented_syscall  // 3Bh: void JoinThread()
-.int    ee_init_main_thread     // 3Ch: void* InitMainThread(uint32 gp, void* stack, int stack_size, char* args, int root)
-.int    _unimplemented_syscall
+.int    ee_init_main_thread     // 3Ch: void* InitMainThread(u32 gp, void* stack, i32 stack_size, char* args, u32 return_address)
+.int    ee_init_heap            // 3Dh: void* InitHeap(void* heap_bottom, i32 heap_size)
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
