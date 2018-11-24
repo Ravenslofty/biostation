@@ -3,6 +3,6 @@
 #ifndef STDOUT_H
 #define STDOUT_H
 
-void ee_kwrite(const void* buf, unsigned int count);
+void ee_kwrite(const void* buf);
 
 #endif // STDOUT_H

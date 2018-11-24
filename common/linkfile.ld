@@ -8,9 +8,9 @@ SECTIONS {
 
         /* Put the EE common interrupt handler at 0x1fc0'0380 */
         . = 0x380;
-        KEEP(*(.ee_int_common));
+        KEEP(*(.ee_exc_common));
 
-        /*. = 0x1fc00480;*/
+        . = 0x400;
         *(.text .text.*);
     }
 

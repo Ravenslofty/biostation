@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 CC	= ee-gcc
-CFLAGS	= -O3 -ffreestanding -std=c99 -I../include
+
+CFLAGS	= -O3 -ffreestanding -std=c99 -I../include -G0
 ASFLAGS	= -I../include
 
-FILES	= bootstrap.o start.o stdout.o mem.o
+FILES	= bootstrap.o mem.o start.o stdout.o thread.o
 
 all: $(FILES)
