@@ -154,6 +154,11 @@ _syscall_handler:
         sync                            // Memory synchronisation.
         eret                            // And return.
 
+// FlushCache is irrelevant to an emulator, so we stub it.
+_ee_flush_cache:
+        jr      ra
+        nop
+
 // A syscall handler that crashes.
 _unimplemented_syscall:
         srl     a0, $3, 2
@@ -288,6 +293,7 @@ _syscalls_start:
 .int    ee_init_heap            // 3Dh: void* InitHeap(void* heap_bottom, i32 heap_size)
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
+.int    _unimplemented_syscall  // 40h
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
@@ -303,6 +309,7 @@ _syscalls_start:
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
+.int    _unimplemented_syscall  // 50h
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
@@ -318,13 +325,11 @@ _syscalls_start:
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
+.int    _unimplemented_syscall  // 60h
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
-.int    _unimplemented_syscall
-.int    _unimplemented_syscall
-.int    _unimplemented_syscall
-.int    _unimplemented_syscall
+.int    _ee_flush_cache         // 64h: FlushCache(i32 mode)
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
