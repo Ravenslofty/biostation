@@ -237,7 +237,7 @@ _syscalls_start:
 .int    _unimplemented_syscall  // 11h: RemoveIntcHandler(int int_cause, int handler_id)
 .int    _unimplemented_syscall  // 12h: AddDmacHandler(int dmac_cause, int (*handler)(), int next, void* arg, int flag)
 .int    _unimplemented_syscall  // 13h: RemoveDmacHandler(int dmac_cause, int handler_id)
-.int    _unimplemented_syscall
+.int    ee_enable_intc          // 14h: _EnableIntc(int cause_bit)
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
