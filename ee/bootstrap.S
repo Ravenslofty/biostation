@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "locations.h"
 #include "regdef.h"
 
 .extern ee_start
@@ -6,18 +7,14 @@
 
 .extern memcpy
 
-#define end_of_ram              0x00100000
-
 // The interrupt handler table sits at 0000'0300
-#define interrupt_table         0x300
 #define interrupt_table_size    16 * 4
 
 // The syscall table sits at 0000'0400
-#define syscall_table           0x400
 #define syscall_table_size      128 * 4
 
 // Kernel stack pointer location.
-#define stack_pointer           end_of_ram
+#define stack_pointer           END_OF_KERNEL_RAM
 
 .text
 // EE assembly startup routine.
@@ -29,21 +26,21 @@ _ee_start:
         mtc0    t0, Status              // interrupts disabled.
        
         // Mask interrupts from the EE interrupt controller.
-        li      t0, 0x1000F010          // INTC_MASK
+        li      t0, EE_INTC_MASK
         sw      zero, 0(t0)
 
         // Now we can set up the C runtime; or enough of it for us, anyway.
-        li      sp, 0x70004000          // Set the stack pointer to the top of scratchpad RAM.
+        li      sp, END_OF_SCRATCH_RAM  // Set the stack pointer to the top of scratchpad RAM.
         
         // Copy the interrupt table.
-        li      a0, interrupt_table
+        li      a0, INTERRUPT_TABLE
         la      a1, _handlers_start
         li      a2, interrupt_table_size
         jal     memcpy
         nop
         
         // Copy the syscall table.
-        li      a0, syscall_table
+        li      a0, SYSCALL_TABLE
         la      a1, _syscalls_start
         li      a2, syscall_table_size
         jal     memcpy
@@ -135,7 +132,7 @@ _syscall_handler:
         addi    k1, -16                 // Save $ra to stack.
         sq      ra, 0(k1)
         
-        la      k0, syscall_table       // Load the start of the syscall table.
+        la      k0, SYSCALL_TABLE       // Load the start of the syscall table.
         andi    $3, 0x7F                // Mask out the "sign" bit of the syscall.
         sll     $3, 2                   // Convert syscall number to index.
         addu    k0, $3                  // Calculate the syscall table offset.
@@ -196,7 +193,7 @@ _ee_interrupt_handler:
         // Then, examine the COP0 Cause register to find which interrupt we have.
         mfc0    k0, Cause
         andi    k0, 0x3F                // Extract Cause.ExcCode.
-        la      t0, interrupt_table     // Load start of handler table
+        la      t0, INTERRUPT_TABLE     // Load start of handler table
         add     k0, t0                  // Add ExcCode to handler table
 
         lq      t0, 0(k1)               // Restore $t0 from stack
@@ -341,8 +338,8 @@ _syscalls_start:
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
-.int    _unimplemented_syscall
-.int    _unimplemented_syscall
+.int    ee_gs_get_imr           // 70h: u64 GsGetIMR()
+.int    ee_gs_put_imr           // 71h: void GsPutIMR(u64 imr)
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall

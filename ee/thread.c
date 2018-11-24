@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "locations.h"
 #include "mem.h"
 #include "types.h"
 
@@ -32,8 +33,6 @@ struct Thread {
 };
 
 // The thread state. 
-#define CURR_THREAD  0x00003000
-#define THREAD_ARRAY 0x00001000
 #define END_OF_RAM   0x02000000
 
 struct Thread* threads = (struct Thread*)THREAD_ARRAY;
