@@ -30,7 +30,7 @@ void ee_start()
     // Load the ELF; at the moment just from a hardcoded address.
     ee_kwrite("Loading ELF\n");
     
-    void (*func)() = parse_elf((const char*)0x1fc01000);
+    void (*func)() = parse_elf((const char*)0x1fc04000);
 
     if (func != 0) {
         ee_kwrite("Load OK.\n");

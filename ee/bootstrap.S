@@ -32,6 +32,12 @@ _ee_start:
         // Now we can set up the C runtime; or enough of it for us, anyway.
         li      sp, END_OF_SCRATCH_RAM  // Set the stack pointer to the top of scratchpad RAM.
         
+        // Zero the interrupt handler callback array.
+        li      a0, 0
+        li      a1, 0
+        li      a2, END_OF_KERNEL_RAM
+        jal     memset
+
         // Copy the interrupt table.
         li      a0, INTERRUPT_TABLE
         la      a1, _handlers_start
@@ -43,6 +49,10 @@ _ee_start:
         la      a1, _syscalls_start
         li      a2, syscall_table_size
         jal     memcpy
+        
+        // Re-enable interrupts.
+        li      t0, 0x70408C01          // Coprocessors all usable, bootstrap exception vectors,
+        mtc0    t0, Status              // interrupts enabled.
 
         // Set up the kernel stack pointer in $k1.
         la      k1, stack_pointer
@@ -52,35 +62,45 @@ _ee_start:
 .global _save_context
 _save_context:
         .set noat
-        addi    k1, -448
-        sq      at, 0(k1)
-        sq      v0, 16(k1)
-        sq      v1, 32(k1)
-        sq      a0, 48(k1)
-        sq      a1, 64(k1)
-        sq      a2, 80(k1)
-        sq      a3, 96(k1)
-        sq      t0, 112(k1)
-        sq      t1, 128(k1)
-        sq      t2, 144(k1)
-        sq      t3, 160(k1)
-        sq      t4, 176(k1)
-        sq      t5, 192(k1)
-        sq      t6, 208(k1)
-        sq      t7, 224(k1)
-        sq      s0, 240(k1)
-        sq      s1, 256(k1)
-        sq      s2, 272(k1)
-        sq      s3, 288(k1)
-        sq      s4, 304(k1)
-        sq      s5, 320(k1)
-        sq      s6, 336(k1)
-        sq      s7, 352(k1)
-        sq      t8, 368(k1)
-        sq      t9, 384(k1)
-        sq      gp, 400(k1)
-        sq      sp, 416(k1)
-        sq      fp, 432(k1)
+        addi    sp, -496
+        sq      at, 0(sp)
+        sq      v0, 16(sp)
+        sq      v1, 32(sp)
+        sq      a0, 48(sp)
+        sq      a1, 64(sp)
+        sq      a2, 80(sp)
+        sq      a3, 96(sp)
+        sq      t0, 112(sp)
+        sq      t1, 128(sp)
+        sq      t2, 144(sp)
+        sq      t3, 160(sp)
+        sq      t4, 176(sp)
+        sq      t5, 192(sp)
+        sq      t6, 208(sp)
+        sq      t7, 224(sp)
+        sq      s0, 240(sp)
+        sq      s1, 256(sp)
+        sq      s2, 272(sp)
+        sq      s3, 288(sp)
+        sq      s4, 304(sp)
+        sq      s5, 320(sp)
+        sq      s6, 336(sp)
+        sq      s7, 352(sp)
+        sq      t8, 368(sp)
+        sq      t9, 384(sp)
+        sq      gp, 400(sp)
+        sq      sp, 416(sp)
+        sq      fp, 432(sp)
+        mflo    t0
+        mflo1   t1
+        mfhi    t2
+        mfhi1   t3
+        mfsa    t4
+        sd      t0, 448(sp)
+        sd      t1, 456(sp)
+        sd      t2, 464(sp)
+        sd      t3, 472(sp)
+        sw      t4, 480(sp)
         j       ra
         .set at
 
@@ -88,35 +108,45 @@ _save_context:
 .global _restore_context
 _restore_context:
         .set noat
-        lq      at, 0(k1)
-        lq      v0, 16(k1)
-        lq      v1, 32(k1)
-        lq      a0, 48(k1)
-        lq      a1, 64(k1)
-        lq      a2, 80(k1)
-        lq      a3, 96(k1)
-        lq      t0, 112(k1)
-        lq      t1, 128(k1)
-        lq      t2, 144(k1)
-        lq      t3, 160(k1)
-        lq      t4, 176(k1)
-        lq      t5, 192(k1)
-        lq      t6, 208(k1)
-        lq      t7, 224(k1)
-        lq      s0, 240(k1)
-        lq      s1, 256(k1)
-        lq      s2, 272(k1)
-        lq      s3, 288(k1)
-        lq      s4, 304(k1)
-        lq      s5, 320(k1)
-        lq      s6, 336(k1)
-        lq      s7, 352(k1)
-        lq      t8, 368(k1)
-        lq      t9, 384(k1)
-        lq      gp, 400(k1)
-        lq      sp, 416(k1)
-        lq      fp, 432(k1)
-        addi    k1, 448
+        ld      t0, 448(sp)
+        ld      t1, 456(sp)
+        ld      t2, 464(sp)
+        ld      t3, 472(sp)
+        lw      t4, 480(sp)
+        mtlo    t0
+        mtlo1   t1
+        mthi    t2
+        mthi1   t3
+        mtsa    t4
+        lq      at, 0(sp)
+        lq      v0, 16(sp)
+        lq      v1, 32(sp)
+        lq      a0, 48(sp)
+        lq      a1, 64(sp)
+        lq      a2, 80(sp)
+        lq      a3, 96(sp)
+        lq      t0, 112(sp)
+        lq      t1, 128(sp)
+        lq      t2, 144(sp)
+        lq      t3, 160(sp)
+        lq      t4, 176(sp)
+        lq      t5, 192(sp)
+        lq      t6, 208(sp)
+        lq      t7, 224(sp)
+        lq      s0, 240(sp)
+        lq      s1, 256(sp)
+        lq      s2, 272(sp)
+        lq      s3, 288(sp)
+        lq      s4, 304(sp)
+        lq      s5, 320(sp)
+        lq      s6, 336(sp)
+        lq      s7, 352(sp)
+        lq      t8, 368(sp)
+        lq      t9, 384(sp)
+        lq      gp, 400(sp)
+        lq      sp, 416(sp)
+        lq      fp, 432(sp)
+        addi    sp, 496
         j       ra
         .set at
 
@@ -171,12 +201,67 @@ _hello:
         addi    k1, 48
         
         j       ra
-        nop
 
-// Handle an interrupt.
+// Handle an interrupt from the DMA controller.
+_ee_dmac_handler:
+        break
+
+// Handle an interrupt from the timer.
+_ee_timer_handler:
+        break
+
+// Interrupt handler in .text to avoid size restrictions.
+_ee_interrupt_handler_big:
+        // Examine the COP0 Cause register to find which interrupt we have.
+        // Is this from the interrupt controller?
+        mfc0    k0, Cause
+        andi    k0, 1 << 10             // Cause.IP2 - Interrupt controller.
+        beq     k0, zero, 1f
+        
+        la      k0, ee_intc_handler
+        j       4f
+1:
+        // Is this from the DMA controller?
+        mfc0    k0, Cause
+        andi    k0, 1 << 11             // Cause.IP3 - DMA controller
+        beq     k0, zero, 2f
+
+        la      k0, _ee_dmac_handler
+        j       4f
+2:
+        // Is this from the timer?
+        mfc0    k0, Cause
+        andi    k0, 1 << 15             // Cause.IP7 - Timer
+        beq     k0, zero, 3f
+
+        la      k0, _ee_timer_handler
+        j       4f
+3:
+        // We have an unrecognised interrupt which indicates a bug somewhere; break.
+        break
+4:
+        // Save ra and sp
+        addi    k1, -32
+        sq      ra, 0(k1)
+        sq      sp, 16(k1)
+
+        move    sp, k1
+
+        // Jump to handler.
+        jalr    k0
+
+        // Restore ra and sp
+        lq      ra, 0(k1)
+        lq      sp, 16(k1)
+        addi    k1, 32
+
+        sync
+        eret
+
+// Handle a common exception.
 .section .ee_exc_common, "a"
-.global _ee_interrupt_handler
-_ee_interrupt_handler:
+.global _ee_common_handler
+_ee_common_handler:
         // First, save the relevant state.
         addi    k1, -16                 // Save $t0 to stack.
         sq      t0, 0(k1)
@@ -192,7 +277,11 @@ _ee_interrupt_handler:
         
         lw      k0, 0(k0)               // Get the handler address.
         jr      k0                      // Jump to the handler.
-        nop
+
+.section .ee_exc_interrupt, "a"
+.global _ee_interrupt_handler
+_ee_interrupt_handler:
+        j       _ee_interrupt_handler_big
 
 .data
 _hello_string:
