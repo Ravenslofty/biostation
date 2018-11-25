@@ -112,6 +112,41 @@ bool ee_disable_intc(int cause_bit)
     return true;
 }
 
+// Enable an interrupt from the DMA controller, returning whether the interrupt mask was updated.
+bool ee_enable_dmac(int cause_bit)
+{
+    int mask = *(volatile int*)EE_DMAC_STAT;
+
+    cause_bit += 16;
+
+    if (mask & (1 << cause_bit)) {
+        return false;
+    } else {
+        mask = 1 << cause_bit;
+        *(volatile int*)EE_DMAC_STAT = mask;
+    }
+    
+    return true;
+}
+
+// Disable an interrupt from the interrupt controller, returning whether the interrupt mask was updated.
+bool ee_disable_dmac(int cause_bit)
+{
+    int mask = *(volatile int*)EE_DMAC_STAT;
+
+    cause_bit += 16;
+
+    if (mask & (1 << cause_bit)) {
+        mask = 1 << cause_bit;
+        *(volatile int*)EE_DMAC_STAT = mask;
+    } else {
+        return false;
+    }
+    
+    return true;
+}
+
+// Add a callback function to the interrupt controller array.
 int ee_add_intc_handler(int cause, int (*handler_func)(int), int next, void* arg, int flag)
 {
     if (next > 0) {

@@ -29,10 +29,17 @@ _ee_start:
         li      t0, EE_INTC_MASK
         sw      zero, 0(t0)
 
+        // Mask interrupts from the DMA controller.
+        li      t0, EE_DMAC_STAT
+        lui     t1, 0x63FF              // Mask channels 0 - 9, stall interrupt and MFIFO empty interrupt.
+        lw      t2, 0(t0)
+        and     t2, t1
+        sw      t2, 0(t0)
+
         // Now we can set up the C runtime; or enough of it for us, anyway.
         li      sp, END_OF_SCRATCH_RAM  // Set the stack pointer to the top of scratchpad RAM.
         
-        // Zero the interrupt handler callback array.
+        // Zero kernel memory.
         li      a0, 0
         li      a1, 0
         li      a2, END_OF_KERNEL_RAM
@@ -328,8 +335,8 @@ _syscalls_start:
 .int    _unimplemented_syscall  // 13h: RemoveDmacHandler(int dmac_cause, int handler_id)
 .int    ee_enable_intc          // 14h: _EnableIntc(int cause_bit)
 .int    ee_disable_intc         // 15h: _DisableIntc(int cause_bit)
-.int    _unimplemented_syscall
-.int    _unimplemented_syscall
+.int    ee_enable_dmac          // 16h: _EnableDmac(int cause_bit)
+.int    ee_disable_dmac         // 17h: _DisableDmac(int cause_bit)
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall
 .int    _unimplemented_syscall

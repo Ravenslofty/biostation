@@ -10,6 +10,8 @@
 
 #define END_OF_RAM		0x02000000
 
+#define EE_DMAC_STAT		0x1000E010
+
 #define EE_INTC_STAT		0x1000F000
 #define EE_INTC_MASK		0x1000F010
 
