@@ -97,6 +97,21 @@ bool ee_enable_intc(int cause_bit)
     return true;
 }
 
+// Disable an interrupt from the interrupt controller, returning whether the interrupt mask was updated.
+bool ee_disable_intc(int cause_bit)
+{
+    int mask = *(volatile int*)EE_INTC_MASK;
+
+    if (mask & (1 << cause_bit)) {
+        mask = 1 << cause_bit;
+        *(volatile int*)EE_INTC_MASK = mask;
+    } else {
+        return false;
+    }
+    
+    return true;
+}
+
 int ee_add_intc_handler(int cause, int (*handler_func)(int), int next, void* arg, int flag)
 {
     if (next > 0) {
