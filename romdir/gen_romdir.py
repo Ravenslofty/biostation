@@ -31,7 +31,6 @@ initial_files = [
 "PILLGEN.elf"
 ]
 
-print(str(initial_files))
 romdir = open("romdir.bin", "wb")
 rom = open("rom.bin", "wb")
 
@@ -115,7 +114,7 @@ else:
 
 rom.seek(0, os.SEEK_END)
 # Pad to 0x400000
-print(hex(rom.tell()) + " : " + hex(0x400000 - rom.tell()))
+print("Used space: {} / {} bytes ({:3f}%)".format(rom.tell(), 0x400000, 100*rom.tell()/0x400000))
 write_bytes(rom, 0x400000 - rom.tell())
 
 rom.close()
