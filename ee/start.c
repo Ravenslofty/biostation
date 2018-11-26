@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "elf.h"
+#include "romdir.h"
 #include "stdout.h"
 
 extern int* _current_thread;
@@ -20,7 +21,7 @@ void ee_start()
 {
     // Produce a friendly hello on the debug console, but also check that the syscall handler is 
     // working.
-    __asm__ volatile("move $3, $0\n"
+    asm volatile("move $3, $0\n"
                 "syscall\n"
                 ::: "$3");
 
@@ -30,7 +31,8 @@ void ee_start()
     // Load the ELF; at the moment just from a hardcoded address.
     ee_kwrite("Loading ELF\n");
     
-    void (*func)() = parse_elf((const char*)0x1fc04000);
+    int addr = romdir_lookup("PILLGEN");
+    void (*func)() = parse_elf((const char*)addr);
 
     if (func != 0) {
         ee_kwrite("Load OK.\n");
@@ -39,5 +41,5 @@ void ee_start()
         ee_kwrite("Load returned a null pointer.\n");
     }
     
-    __asm__ volatile("break");
+    asm volatile("break");
 }
