@@ -8,9 +8,9 @@
 // The thread state. 
 #define END_OF_RAM   0x02000000
 
-struct Thread* threads = (struct Thread*)THREAD_ARRAY;
-int* _current_thread = (int*)CURR_THREAD;
-#define current_thread threads[*_current_thread]
+struct Thread threads[256];
+int _current_thread;
+#define current_thread threads[_current_thread]
 
 // Initialise the main thread, setting up the stack and returning it.
 void* ee_init_main_thread(u32 gp, void* stack_ptr, i32 stack_size, char* args, u32 return_address)

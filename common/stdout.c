@@ -12,3 +12,12 @@ void ee_kwrite(const char* buf)
     }
 }
 
+void iop_kwrite(const char* buf)
+{
+    unsigned int count = strlen(buf);
+    volatile char* const iop_debug_out = (volatile char*)0x1F80380C;
+
+    for (unsigned int i = 0; i < count; i++) {
+        *iop_debug_out = buf[i];
+    }
+}

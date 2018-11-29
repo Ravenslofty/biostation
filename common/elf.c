@@ -30,33 +30,43 @@ struct ElfProgramHeader {
     u32     p_align;        // 28-31
 };
 
+struct ElfSectionHeader {
+    u32     sh_name;
+    u32     sh_type;
+    u32     sh_flags;
+    void*   sh_addr;
+    u32     sh_offset;
+    u32     sh_size;
+    u32     sh_link;
+    u32     sh_info;
+    u32     sh_addralign;
+    u32     sh_entsize;
+};
+
 void* parse_elf(char* ELF_file)
 {
-    struct ElfHeader* header = (struct ElfHeader*)ELF_file;
-    u32 e_phoff = header->e_phoff;
-    u16 e_phnum = header->e_phnum;
+    u32 e_ident = *(u32*)&ELF_file[0x00];
+    u32 e_entry = *(u32*)&ELF_file[0x18];
+    u32 e_phoff = *(u32*)&ELF_file[0x1C];
+    u16 e_phnum = *(u16*)&ELF_file[0x2C];
 
-    if (header->e_ident[0] != '\x7f' || 
-            header->e_ident[1] != 'E' ||
-            header->e_ident[2] != 'L' ||
-            header->e_ident[3] != 'F') {
+    if (e_ident != 0x464C457F) {
         ee_kwrite("[!!] Invalid ELF header.\n");
-        __asm__ volatile("break");
+        asm volatile("break");
     }
 
-    for (u32 i = e_phoff; i < e_phoff + (e_phnum * 0x20); i += 0x20) {
-        struct ElfProgramHeader* prog_header = (struct ElfProgramHeader*)(ELF_file + i);
-        u32 p_offset = prog_header->p_offset;
-        u32 p_paddr = prog_header->p_paddr;
-        u32 p_filesz = prog_header->p_filesz;
+    for (unsigned int i = e_phoff; i < e_phoff + (e_phnum * 0x20); i += 0x20) {
+        u32 p_offset = *(u32*)&ELF_file[i + 0x4];
+        u32 p_paddr = *(u32*)&ELF_file[i + 0xC];
+        u32 p_filesz = *(u32*)&ELF_file[i + 0x10];
 
-        u32 mem_w = p_paddr;
-        for (u32 file_w = p_offset; file_w < (p_offset + p_filesz); file_w += 4) {
+        int mem_w = p_paddr;
+        for (unsigned int file_w = p_offset; file_w < (p_offset + p_filesz); file_w += 4) {
             u32 word = *(u32*)&ELF_file[file_w];
             *(u32*)mem_w = word;
             mem_w += 4;
         }
     }
-
-    return header->e_entry;
+    
+    return (void*)e_entry;
 }

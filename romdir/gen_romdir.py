@@ -28,6 +28,7 @@ initial_files = [
 "RESET.bin",
 "ROMDIR.stub",
 "ROMVER.txt",
+"EEKERNEL.elf",
 "PILLGEN.elf"
 ]
 

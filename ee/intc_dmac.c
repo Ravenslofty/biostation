@@ -18,7 +18,7 @@ struct Handler {
 };
 
 #define HANDLER_ARRAY_SIZE 96
-struct Handler* handlers = (struct Handler*)HANDLER_ARRAY;
+struct Handler handlers[HANDLER_ARRAY_SIZE];
 
 void _save_context();
 void _restore_context();

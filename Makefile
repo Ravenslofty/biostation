@@ -3,16 +3,26 @@ OBJCOPY	= ee-objcopy
 
 .PHONY: all common ee iop
 
-all: common ee iop
-	$(CC) -ffreestanding -nostdlib -T common/linkfile.ld -Wl,-N common/*.o ee/*.o iop/*.o -o common/RESET.elf
-	$(OBJCOPY) -I elf32-littlemips -O binary common/RESET.elf bin/RESET.bin
+all: rom.bin
+	printf "\aYour BIOS is ready; get it while it's hot.\n"
+
+romdir.bin rom.bin: bin/RESET.bin bin/EEKERNEL.elf 
 	romdir/gen_romdir.py
 
-common:
-	$(MAKE) -C common
+bin/RESET.bin: common/RESET.elf
+	$(OBJCOPY) -I elf32-littlemips -O binary common/RESET.elf bin/RESET.bin
 
-ee:
+bin/EEKERNEL.elf: ee/EEKERNEL.elf
+	cp ee/EEKERNEL.elf bin/
+
+bin/LOADCORE.irx: iop/LOADCORE.irx
+	cp iop/loadcore/LOADCORE.irx
+
+ee/EEKERNEL.elf:
 	$(MAKE) -C ee
 
-iop:
-	$(MAKE) -C iop
+common/RESET.elf:
+	$(MAKE) -C common
+
+iop/LOADCORE.irx:
+	$(MAKE) -C iop/loadcore

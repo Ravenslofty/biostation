@@ -18,11 +18,18 @@
 
 .text
 // EE assembly startup routine.
-.global _ee_start
-_ee_start:
+.global _start
+_start:
+        // Set up the C runtime; or enough of it for us, anyway.
+        li      sp, END_OF_SCRATCH_RAM  // Set the stack pointer to the top of scratchpad RAM.
+
+        // Announce our presence to the debugger on the other end of the screen.
+        la      a0, _load_ok
+        jal     ee_kwrite
+
         // Set up the system control coprocessor. This skips a lot of initialisation which is
         // meaningless to an emulator, but very important on physical hardware, like MMU init.
-        li      t0, 0x70400000          // Coprocessors all usable, bootstrap exception vectors,
+        li      t0, 0x70000000          // Coprocessors all usable, normal exception vectors,
         mtc0    t0, Status              // interrupts disabled.
        
         // Mask interrupts from the EE interrupt controller.
@@ -36,30 +43,22 @@ _ee_start:
         and     t2, t1
         sw      t2, 0(t0)
 
-        // Now we can set up the C runtime; or enough of it for us, anyway.
-        li      sp, END_OF_SCRATCH_RAM  // Set the stack pointer to the top of scratchpad RAM.
-        
-        // Zero kernel memory.
-        li      a0, 0
-        li      a1, 0
-        li      a2, END_OF_KERNEL_RAM
+        la      a0, _interrupts_off
+        jal     ee_kwrite
+
+        // Zero the .bss section.
+        la      a0, _start_of_bss
+        la      a1, 0
+        la      a2, _end_of_bss
+        sub     a2, a0
         jal     memset
 
-        // Copy the interrupt table.
-        li      a0, INTERRUPT_TABLE
-        la      a1, _handlers_start
-        li      a2, interrupt_table_size
-        jal     memcpy
-        
-        // Copy the syscall table.
-        li      a0, SYSCALL_TABLE
-        la      a1, _syscalls_start
-        li      a2, syscall_table_size
-        jal     memcpy
-        
         // Re-enable interrupts.
-        li      t0, 0x70408C01          // Coprocessors all usable, bootstrap exception vectors,
+        li      t0, 0x70008C01          // Coprocessors all usable, normal exception vectors,
         mtc0    t0, Status              // interrupts enabled.
+
+        la      a0, _interrupts_on
+        jal     ee_kwrite
 
         // Set up the kernel stack pointer in $k1.
         la      k1, stack_pointer
@@ -164,7 +163,7 @@ _syscall_handler:
         addi    k1, -16                 // Save $ra to stack.
         sq      ra, 0(k1)
         
-        la      k0, SYSCALL_TABLE       // Load the start of the syscall table.
+        la      k0, _syscalls_start     // Load the start of the syscall table.
         andi    $3, 0x7F                // Mask out the "sign" bit of the syscall.
         sll     $3, 2                   // Convert syscall number to index.
         addu    k0, $3                  // Calculate the syscall table offset.
@@ -276,7 +275,7 @@ _ee_common_handler:
         // Then, examine the COP0 Cause register to find which interrupt we have.
         mfc0    k0, Cause
         andi    k0, 0x3F                // Extract Cause.ExcCode.
-        la      t0, INTERRUPT_TABLE     // Load start of handler table
+        la      t0, _handlers_start     // Load start of handler table
         add     k0, t0                  // Add ExcCode to handler table
 
         lq      t0, 0(k1)               // Restore $t0 from stack
@@ -291,8 +290,21 @@ _ee_interrupt_handler:
         j       _ee_interrupt_handler_big
 
 .data
+_load_ok:
+.asciz  "[EE] _start: Load OK\n"
+.align
+
+_interrupts_off:
+.asciz  "[EE] _start: Interrupts disabled\n"
+.align
+
+_interrupts_on:
+.asciz  "[EE] _start: Interrupts enabled\n"
+.align
+
 _hello_string:
 .asciz  "Hello, World!\n"
+.align
 
 _handlers_start:
 .int    _unimplemented_syscall  // 00: Interrupt.

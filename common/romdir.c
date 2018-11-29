@@ -9,7 +9,7 @@ struct Entry {
     u32 file_size;
 } __attribute__((packed));
 
-int romdir_lookup(const char* name)
+char* romdir_lookup(const char* name)
 {
     // Look for the RESET string that marks the beginning of the ROMDIR table.
     // Note that we can't use strcmp because that would put the "RESET" string in the wrong place.
@@ -28,6 +28,12 @@ int romdir_lookup(const char* name)
         rom_ptr++;
     }
 
+    if ((int)rom_ptr >= 0x20000000) {
+        //ee_kwrite("[!!] romdir_lookup: Couldn't find start of ROMDIR\n");
+
+        asm volatile("break");
+    }
+
     struct Entry* romdir = (struct Entry*)rom_ptr;
     rom_ptr = (char*)0x1fc00000;
 
@@ -40,14 +46,14 @@ int romdir_lookup(const char* name)
                 }
             }
             if (i == strlen(romdir->name)) {
-                return (int)rom_ptr;
+                return rom_ptr;
             }
         }
 
         rom_ptr += romdir->file_size;
     }
 
-    ee_kwrite("[!!] romdir_lookup: Couldn't find entry in ROMDIR\n");
+    //ee_kwrite("[!!] romdir_lookup: Couldn't find entry in ROMDIR\n");
 
     asm volatile("break");
 }
