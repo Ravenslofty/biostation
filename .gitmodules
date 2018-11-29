@@ -1,0 +1,3 @@
+[submodule "iop/ps2iop"]
+	path = iop/ps2iop
+	url = https://github.com/uyjulian/ps2iop
