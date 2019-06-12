@@ -18,10 +18,10 @@ bin/EEKERNEL.elf: ee/EEKERNEL.elf
 bin/LOADCORE.irx: iop/LOADCORE.irx
 	cp iop/loadcore/LOADCORE.irx
 
-ee/EEKERNEL.elf:
+ee/EEKERNEL.elf: $(wildcard ee/*.c ee/*.h ee/*.S include/*.h)
 	$(MAKE) -C ee
 
-common/RESET.elf:
+common/RESET.elf: $(wildcard common/*.c common/*.h common/*.S include/*.h)
 	$(MAKE) -C common
 
 iop/LOADCORE.irx:

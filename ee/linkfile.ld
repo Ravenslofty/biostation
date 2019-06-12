@@ -3,7 +3,7 @@
 ENTRY(_start);
 
 SECTIONS {
-    .text 0x00000000 : {
+    .text 0x80000000 : {
         KEEP(*(.ee_exc_tlbmiss));
 
         . = 0x080;

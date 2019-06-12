@@ -6,7 +6,7 @@
 
 // MIPS registers.
 #define zero	$0
-#define at	$at
+// at is $1, but using a preprocessor macro for this interferes with `.set at`.
 #define v0	$2
 #define v1	$3
 #define a0	$4
@@ -40,7 +40,12 @@
 #define pc	$pc
 
 // MIPS Coprocessor 0 registers.
+#define Index    $0
+#define EntryLo0 $2
+#define EntryLo1 $3
+#define PageMask $5
 #define BadVAddr $8
+#define EntryHi  $10
 #define Status	 $12
 #define Cause	 $13
 #define EPC	 $14

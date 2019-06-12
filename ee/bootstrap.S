@@ -16,10 +16,63 @@
 // Kernel stack pointer location.
 #define stack_pointer           END_OF_KERNEL_RAM
 
+.macro TLB_INDEX index
+        li      k0, \index
+        mtc0    k0, Index
+.endm
+
+.macro TLB_ENTRY_LO0 is_scratch, pfn, cache_mode, dirty, valid, global
+        li      k0, (\is_scratch << 31) + (\pfn << 6) + (\cache_mode << 3) + (\dirty << 2) + (\valid << 1) + \global
+        mtc0    k0, EntryLo0
+.endm
+
+.macro TLB_ENTRY_LO1 pfn, cache_mode, dirty, valid, global
+        li      k0, (\pfn << 6) + (\cache_mode << 3) + (\dirty << 2) + (\valid << 1) + \global
+        mtc0    k0, EntryLo1
+.endm
+
+.macro TLB_ENTRY_HI vpn2, asid
+        li      k0, (\vpn2 << 13) + \asid
+        mtc0    k0, EntryHi
+.endm
+
+.macro TLB_PAGE_MASK mask
+        li      k0, \mask
+        mtc0    k0, PageMask
+.endm
+
+.macro TLB_WRITE
+        sync.p
+        tlbwi
+        sync.p
+.endm
+
 .text
 // EE assembly startup routine.
 .global _start
+.ent _start
 _start:
+        // Map PS2 memory using the TLB.
+        // Mark everything as invalid (for now)
+        TLB_ENTRY_LO0   0, 0, 0, 0, 0, 0
+        TLB_ENTRY_LO1   0, 0, 0, 0, 0
+        TLB_ENTRY_HI    0, 0
+
+        li              t0, 47
+1:
+        mtc0            t0, Index
+        TLB_WRITE
+        addiu           t0, -1
+        bnez            t0, 1b
+
+        // Scratchpad: 16KiB from scratch address 0 to 0x4000
+        TLB_INDEX       0
+        TLB_ENTRY_LO0   1, 0, 0, 1, 1, 1
+        TLB_ENTRY_LO1   0, 0, 1, 1, 1
+        TLB_ENTRY_HI    0x38000, 0
+        TLB_PAGE_MASK   0
+        TLB_WRITE
+
         // Set up the C runtime; or enough of it for us, anyway.
         li      sp, END_OF_SCRATCH_RAM  // Set the stack pointer to the top of scratchpad RAM.
 
@@ -32,6 +85,10 @@ _start:
         li      t0, 0x70000000          // Coprocessors all usable, normal exception vectors,
         mtc0    t0, Status              // interrupts disabled.
        
+        // Fully initialise the TLB from C.
+        // This is an incredibly awful workaround for as not understanding MIPS memory segmentation.
+        //jal     ee_tlb_init
+
         // Mask interrupts from the EE interrupt controller.
         li      t0, EE_INTC_MASK
         sw      zero, 0(t0)
@@ -63,13 +120,14 @@ _start:
         // Set up the kernel stack pointer in $k1.
         la      k1, stack_pointer
         j       ee_start                // Jump to C.
+.end _start
 
 // Preserve all registers except $k0, $k1 and $ra.
 .global _save_context
 _save_context:
         .set noat
         addi    sp, -496
-        sq      at, 0(sp)
+        sq      $at, 0(sp)
         sq      v0, 16(sp)
         sq      v1, 32(sp)
         sq      a0, 48(sp)
@@ -124,7 +182,7 @@ _restore_context:
         mthi    t2
         mthi1   t3
         mtsa    t4
-        lq      at, 0(sp)
+        lq      $at, 0(sp)
         lq      v0, 16(sp)
         lq      v1, 32(sp)
         lq      a0, 48(sp)
@@ -172,10 +230,10 @@ _syscall_handler:
         jalr    k0                      // Jump to it.
         
         lq      ra, 0(k1)               // Restore $ra from stack.
-        addi    k1, 16
+        addiu   k1, 16
 
         mfc0    k0, EPC                 // Increment EPC to run the next instruction.
-        addi    k0, 4
+        addiu   k0, 4
         mtc0    k0, EPC
         
         sync                            // Memory synchronisation.
@@ -184,6 +242,17 @@ _syscall_handler:
 // FlushCache is irrelevant to an emulator, so we stub it.
 _ee_flush_cache:
         jr      ra
+
+// An exception handler that crashes.
+_unimplemented_exception:
+
+        mfc0    k0, Cause
+        andi    k0, 0x3F                // Extract Cause.ExcCode.
+        la      k1, _exception_strings_start
+        addu    a0, k0, k1
+        jal     ee_kwrite
+        j       _start
+1:      j       1b
 
 // A syscall handler that crashes.
 _unimplemented_syscall:
@@ -295,7 +364,7 @@ _load_ok:
 .align
 
 _interrupts_off:
-.asciz  "[EE] _start: Interrupts disabled\n"
+.asciz  "[EE] _start: TLB set up, interrupts disabled\n"
 .align
 
 _interrupts_on:
@@ -303,26 +372,77 @@ _interrupts_on:
 .align
 
 _hello_string:
-.asciz  "Hello, World!\n"
+.asciz  "[EE] Hello, World!\n"
 .align
 
+_interrupt:
+.asciz "Interrupt\n"
+_tlb_modified:
+.asciz "TLB Modified\n"
+_tlb_miss_load:
+.asciz "TLB Miss (load)\n"
+_tlb_miss_store:
+.asciz "TLB Miss (store)\n"
+_address_error_load:
+.asciz "Address Error (load)\n"
+_address_error_store:
+.asciz "Address Error (store)\n"
+_bus_error_instruction:
+.asciz "Bus Error (instruction)\n"
+_bus_error_data:
+.asciz "Bus Error (data)\n"
+_system_call:
+.asciz "System Call\n"
+_breakpoint:
+.asciz "Breakpoint\n"
+_reserved_instruction:
+.asciz "Reserved Instruction\n"
+_coprocessor_unusable:
+.asciz "Coprocessor Unusable\n"
+_overflow:
+.asciz "Overflow\n"
+_trap:
+.asciz "Trap\n"
+_exception_14:
+.asciz "Unknown exception 14\n"
+_exception_15:
+.asciz "Unknown exception 15\n"
+
+_exception_strings_start:
+.int    _interrupt
+.int    _tlb_modified
+.int    _tlb_miss_load
+.int    _tlb_miss_store
+.int    _address_error_load
+.int    _address_error_store
+.int    _bus_error_instruction
+.int    _bus_error_data
+.int    _system_call
+.int    _breakpoint
+.int    _reserved_instruction
+.int    _coprocessor_unusable
+.int    _overflow
+.int    _trap
+.int    _exception_14
+.int    _exception_15
+
 _handlers_start:
-.int    _unimplemented_syscall  // 00: Interrupt.
-.int    _unimplemented_syscall  // 01: TLB Modified.
-.int    _unimplemented_syscall  // 02: TLB Refill (load)
-.int    _unimplemented_syscall  // 03: TLB Refill (store)
-.int    _unimplemented_syscall  // 04: Address error (load)
-.int    _unimplemented_syscall  // 05: Address error (store)
-.int    _unimplemented_syscall  // 06: Bus error (instruction)
-.int    _unimplemented_syscall  // 07: Bus error (data)
-.int    _syscall_handler        // 08: System call
-.int    _unimplemented_syscall  // 09: Breakpoint
-.int    _unimplemented_syscall  // 10: Reserved instruction
-.int    _unimplemented_syscall  // 11: Coprocessor unusable
-.int    _unimplemented_syscall  // 12: Overflow
-.int    _unimplemented_syscall  // 13: Trap
-.int    _unimplemented_syscall
-.int    _unimplemented_syscall
+.int    _ee_interrupt_handler     // 00: Interrupt.
+.int    _unimplemented_exception  // 01: TLB Modified.
+.int    _unimplemented_exception  // 02: TLB Miss (load)
+.int    _unimplemented_exception  // 03: TLB Miss (store)
+.int    _unimplemented_exception  // 04: Address error (load)
+.int    _unimplemented_exception  // 05: Address error (store)
+.int    _unimplemented_exception  // 06: Bus error (instruction)
+.int    _unimplemented_exception  // 07: Bus error (data)
+.int    _syscall_handler          // 08: System call
+.int    _unimplemented_exception  // 09: Breakpoint
+.int    _unimplemented_exception  // 10: Reserved instruction
+.int    _unimplemented_exception  // 11: Coprocessor unusable
+.int    _unimplemented_exception  // 12: Overflow
+.int    _unimplemented_exception  // 13: Trap
+.int    _unimplemented_exception
+.int    _unimplemented_exception
 
 _syscalls_start:
 .int    _hello                  // 00h: Hello()

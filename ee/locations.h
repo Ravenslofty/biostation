@@ -6,7 +6,7 @@
 #define GS_INTERRUPT_MASK	0x00004004
 #define HANDLER_ARRAY           0x00005000
 
-#define END_OF_KERNEL_RAM       0x00100000
+#define END_OF_KERNEL_RAM       0x80100000
 
 #define END_OF_RAM		0x02000000
 

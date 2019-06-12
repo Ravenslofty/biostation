@@ -44,8 +44,6 @@ void ee_intc_handler()
             for (int i = start; i < end; i++) {
                 if (handlers[i].func != 0 && handlers[i].cause == bit) {
 
-                    ee_kwrite("Calling INTC handler\n");
-
                     // Swap the global pointers.
                     u32 new_gp = handlers[i].gp;
                     u32 old_gp;
@@ -66,8 +64,6 @@ void ee_intc_handler()
                         : "=r" (new_gp)
                         : "r" (old_gp)
                     );
-
-                    ee_kwrite("Returned from INTC handler\n");
                 }
             }
 

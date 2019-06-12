@@ -13,7 +13,7 @@ char* romdir_lookup(const char* name)
 {
     // Look for the RESET string that marks the beginning of the ROMDIR table.
     // Note that we can't use strcmp because that would put the "RESET" string in the wrong place.
-    char* rom_ptr = (char*)0x1fc00000;
+    char* rom_ptr = (char*)0x9fc00000;
 
     while ((int)rom_ptr < 0x20000000) {
         if (rom_ptr[0] == 'R' &&
