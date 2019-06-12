@@ -56,4 +56,5 @@ char* romdir_lookup(const char* name)
     //ee_kwrite("[!!] romdir_lookup: Couldn't find entry in ROMDIR\n");
 
     asm volatile("break");
+    // unreachable
 }

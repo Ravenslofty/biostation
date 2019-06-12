@@ -7,4 +7,4 @@ ASFLAGS	= -I../include
 FILES	= bootstrap.o gs.o intc_dmac.o start.o thread.o ../common/elf.o ../common/mem.o ../common/romdir.o ../common/stdout.o
 
 all: $(FILES)
-	$(CC) -ffreestanding -nostdlib -T linkfile.ld -Wl,-N $(FILES) -o EEKERNEL.elf
+	$(CC) -ffreestanding -nostdlib -T linkfile.ld $(FILES) -o EEKERNEL.elf
