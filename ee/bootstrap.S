@@ -16,66 +16,11 @@
 // Kernel stack pointer location.
 #define stack_pointer           END_OF_KERNEL_RAM
 
-.macro TLB_INDEX index
-        li      k0, \index
-        mtc0    k0, Index
-.endm
-
-.macro TLB_ENTRY_LO0 is_scratch, pfn, cache_mode, dirty, valid, global
-        li      k0, (\is_scratch << 31) + (\pfn << 6) + (\cache_mode << 3) + (\dirty << 2) + (\valid << 1) + \global
-        mtc0    k0, EntryLo0
-.endm
-
-.macro TLB_ENTRY_LO1 pfn, cache_mode, dirty, valid, global
-        li      k0, (\pfn << 6) + (\cache_mode << 3) + (\dirty << 2) + (\valid << 1) + \global
-        mtc0    k0, EntryLo1
-.endm
-
-.macro TLB_ENTRY_HI vpn2, asid
-        li      k0, (\vpn2 << 13) + \asid
-        mtc0    k0, EntryHi
-.endm
-
-.macro TLB_PAGE_MASK mask
-        li      k0, \mask
-        mtc0    k0, PageMask
-.endm
-
-.macro TLB_WRITE
-        sync.p
-        tlbwi
-        sync.p
-.endm
-
 .text
 // EE assembly startup routine.
 .global _start
 .ent _start
 _start:
-        // Map PS2 memory using the TLB.
-        // Mark everything as invalid (for now)
-        TLB_ENTRY_LO0   0, 0, 0, 0, 0, 0
-        TLB_ENTRY_LO1   0, 0, 0, 0, 0
-        TLB_ENTRY_HI    0, 0
-
-        li              t0, 47
-1:
-        mtc0            t0, Index
-        TLB_WRITE
-        addiu           t0, -1
-        bnez            t0, 1b
-
-        // Scratchpad: 16KiB from scratch address 0 to 0x4000
-        TLB_INDEX       0
-        TLB_ENTRY_LO0   1, 0, 0, 1, 1, 1
-        TLB_ENTRY_LO1   0, 0, 1, 1, 1
-        TLB_ENTRY_HI    0x38000, 0
-        TLB_PAGE_MASK   0
-        TLB_WRITE
-
-        // Set up the C runtime; or enough of it for us, anyway.
-        li      sp, END_OF_SCRATCH_RAM  // Set the stack pointer to the top of scratchpad RAM.
-
         // Announce our presence to the debugger on the other end of the screen.
         la      a0, _load_ok
         jal     ee_kwrite
@@ -88,6 +33,7 @@ _start:
         // Fully initialise the TLB from C.
         // This is an incredibly awful workaround for as not understanding MIPS memory segmentation.
         //jal     ee_tlb_init
+
 
         // Mask interrupts from the EE interrupt controller.
         li      t0, EE_INTC_MASK

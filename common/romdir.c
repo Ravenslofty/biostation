@@ -15,7 +15,7 @@ char* romdir_lookup(const char* name)
     // Note that we can't use strcmp because that would put the "RESET" string in the wrong place.
     char* rom_ptr = (char*)0x9fc00000;
 
-    while ((int)rom_ptr < 0x20000000) {
+    while ((int)rom_ptr < 0xA0000000) {
         if (rom_ptr[0] == 'R' &&
             rom_ptr[1] == 'E' &&
             rom_ptr[2] == 'S' &&
@@ -28,14 +28,14 @@ char* romdir_lookup(const char* name)
         rom_ptr++;
     }
 
-    if ((int)rom_ptr >= 0x20000000) {
+    if ((int)rom_ptr >= 0xA0000000) {
         //ee_kwrite("[!!] romdir_lookup: Couldn't find start of ROMDIR\n");
 
         asm volatile("break");
     }
 
     struct Entry* romdir = (struct Entry*)rom_ptr;
-    rom_ptr = (char*)0x1fc00000;
+    rom_ptr = (char*)0x9fc00000;
 
     for (; romdir->file_size != 0; romdir++) {
         if (strlen(romdir->name) == strlen(name)) {

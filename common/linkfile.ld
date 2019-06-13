@@ -3,7 +3,7 @@
 ENTRY(_start);
 
 SECTIONS {
-    .text 0x1fc00000 : {
+    .text 0xbfc00000 : {
         KEEP(*(.common_start));
 
         . = 0x100;
