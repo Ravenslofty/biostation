@@ -354,6 +354,7 @@ _exception_14:
 _exception_15:
 .asciz "Unknown exception 15\n"
 
+.align  4
 _exception_strings_start:
 .int    _interrupt
 .int    _tlb_modified
@@ -372,6 +373,7 @@ _exception_strings_start:
 .int    _exception_14
 .int    _exception_15
 
+.align  4
 _handlers_start:
 .int    _ee_interrupt_handler     // 00: Interrupt.
 .int    _unimplemented_exception  // 01: TLB Modified.
@@ -390,6 +392,7 @@ _handlers_start:
 .int    _unimplemented_exception
 .int    _unimplemented_exception
 
+.align  4
 _syscalls_start:
 .int    _hello                  // 00h: Hello()
 .int    _unimplemented_syscall  // 01h: ResetEE(int devices)
